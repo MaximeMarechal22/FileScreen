@@ -8,7 +8,13 @@ FileScreen v1.0
 - v2.1: cache images LRU, session requests persistante, pool threads, optimisations memoire
 - v2.2: commandes avancees (@pseudo, !anim, #modif, !option), nouveau logo
 - v2.3: syntaxe simplifiee (!chute au lieu de ![chute]), couleur d'accent personnalisable, UI amelioree
+- v2.4: auto-update : verification au demarrage, pop-up si MàJ dispo, telechargement + relance installeur
 """
+
+# ── Version de l'application ───────────────────────────────────────────────
+APP_VERSION = "2.3.0"   # ← à incrémenter à chaque release publiée sur GitHub
+# URL de l'API GitHub Releases
+_GITHUB_API_URL = "https://api.github.com/repos/MaximeMarechal22/FileScreen/releases/latest"
 
 import tkinter as tk
 import threading
@@ -206,6 +212,162 @@ def log(msg):
     if cb is not None:
         try: cb(msg)
         except Exception: pass
+
+# ── auto-update ───────────────────────────────────────────────────────────
+
+def _version_tuple(v):
+    """Convertit '2.4.0' en (2, 4, 0) pour comparaison."""
+    try:
+        return tuple(int(x) for x in v.strip().lstrip("v").split("."))
+    except Exception:
+        return (0,)
+
+def check_for_update(root_window):
+    """Vérifie silencieusement (thread) si une MàJ est disponible sur GitHub.
+    Affiche une pop-up CTk sur le thread principal si c'est le cas."""
+    def _check():
+        try:
+            import urllib.request as _ur, json as _json
+            req = _ur.Request(_GITHUB_API_URL,
+                              headers={"User-Agent": "FileScreen-Updater"})
+            with _ur.urlopen(req, timeout=6) as r:
+                data = _json.loads(r.read())
+
+            latest_tag = data.get("tag_name", "").lstrip("v")
+            if not latest_tag:
+                return
+
+            # Cherche un asset .exe (l'installeur)
+            installer_url = None
+            for asset in data.get("assets", []):
+                if asset.get("name", "").lower().endswith(".exe"):
+                    installer_url = asset["browser_download_url"]
+                    break
+
+            if (_version_tuple(latest_tag) > _version_tuple(APP_VERSION)
+                    and installer_url):
+                root_window.after(
+                    0, lambda: _show_update_popup(root_window, latest_tag, installer_url)
+                )
+        except Exception as e:
+            log(f"[UPDATE] Vérification échouée : {e}")
+
+    threading.Thread(target=_check, daemon=True).start()
+
+
+def _show_update_popup(root, new_version, download_url):
+    """Pop-up customtkinter proposant la MàJ."""
+    try:
+        import customtkinter as _ctk_up
+    except ImportError:
+        return
+
+    popup = _ctk_up.CTkToplevel(root)
+    popup.title("Mise à jour disponible")
+    popup.geometry("420x190")
+    popup.resizable(False, False)
+    popup.grab_set()
+    popup.lift()
+    popup.focus_force()
+
+    _ctk_up.CTkLabel(
+        popup,
+        text=f"🎉  FileScreen {new_version} est disponible !",
+        font=_ctk_up.CTkFont(size=15, weight="bold"),
+    ).pack(pady=(26, 4))
+
+    _ctk_up.CTkLabel(
+        popup,
+        text=f"Version installée : {APP_VERSION}",
+        text_color="gray",
+    ).pack()
+
+    _ctk_up.CTkLabel(
+        popup,
+        text="L'installeur sera téléchargé puis lancé automatiquement.",
+        text_color="gray",
+        font=_ctk_up.CTkFont(size=11),
+    ).pack(pady=(2, 0))
+
+    def do_update():
+        popup.destroy()
+        _download_and_run_installer(root, download_url, new_version)
+
+    btn_frame = _ctk_up.CTkFrame(popup, fg_color="transparent")
+    btn_frame.pack(pady=18)
+    _ctk_up.CTkButton(btn_frame, text="Mettre à jour",
+                      command=do_update).pack(side="left", padx=10)
+    _ctk_up.CTkButton(btn_frame, text="Plus tard",
+                      fg_color="gray40",
+                      hover_color="gray30",
+                      command=popup.destroy).pack(side="left", padx=10)
+
+
+def _download_and_run_installer(root, url, version):
+    """Télécharge l'installeur avec une barre de progression, le lance, puis ferme l'app."""
+    try:
+        import customtkinter as _ctk_dl
+    except ImportError:
+        return
+
+    prog_win = _ctk_dl.CTkToplevel(root)
+    prog_win.title("Téléchargement…")
+    prog_win.geometry("380x130")
+    prog_win.resizable(False, False)
+    prog_win.grab_set()
+    prog_win.lift()
+
+    lbl = _ctk_dl.CTkLabel(
+        prog_win,
+        text=f"Téléchargement de FileScreen {version}…",
+        font=_ctk_dl.CTkFont(size=13),
+    )
+    lbl.pack(pady=(22, 8))
+
+    bar = _ctk_dl.CTkProgressBar(prog_win, width=320)
+    bar.set(0)
+    bar.pack()
+
+    def _set_label(txt):
+        try:
+            lbl.configure(text=txt)
+        except Exception:
+            pass
+
+    def _dl():
+        try:
+            import urllib.request as _ur
+            dest = os.path.join(
+                tempfile.gettempdir(), f"FileScreen_Setup_{version}.exe"
+            )
+            req = _ur.Request(url, headers={"User-Agent": "FileScreen-Updater"})
+            with _ur.urlopen(req) as resp:
+                total = int(resp.headers.get("Content-Length") or 0)
+                downloaded = 0
+                with open(dest, "wb") as f:
+                    while True:
+                        chunk = resp.read(65536)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total:
+                            prog_win.after(0, bar.set, downloaded / total)
+
+            prog_win.after(0, lambda: _launch(dest))
+        except Exception as e:
+            log(f"[UPDATE] Échec téléchargement : {e}")
+            prog_win.after(0, lambda: _set_label("Erreur lors du téléchargement."))
+
+    def _launch(installer_path):
+        try:
+            prog_win.destroy()
+        except Exception:
+            pass
+        subprocess.Popen([installer_path], shell=True)
+        root.after(600, root.destroy)   # ferme FileScreen proprement
+
+    threading.Thread(target=_dl, daemon=True).start()
 
 # ── historique des overlays ────────────────────────────────────────────────
 _history_entries = []          # liste de dicts, max 200 entrées
@@ -3396,6 +3558,7 @@ if __name__ == "__main__":
         app = MemedropApp()
         global _app_root; _app_root = app
         app.after(200, _process_overlay_queue, app)
+        app.after(3000, lambda: check_for_update(app))  # vérif MàJ 3s après démarrage
         app.mainloop()
 
     splash.after(30, _check_libs_ready)
