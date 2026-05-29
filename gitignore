@@ -1,0 +1,42 @@
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# ── Environnements virtuels ────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Config utilisateur (contient le token Discord !) ──────────────────────
+filescreen_config.json
+
+# ── Build / distribution ───────────────────────────────────────────────────
+build/
+dist/
+*.spec
+*.exe
+*.zip
+*.tar.gz
+
+# ── Inno Setup / NSIS ─────────────────────────────────────────────────────
+Output/
+installer/
+
+# ── Logs & temp ───────────────────────────────────────────────────────────
+*.log
+tmp/
+temp/
+
+# ── OS ────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
