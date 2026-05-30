@@ -1,5 +1,5 @@
 """
-FileScreen v1.0
+FileScreen v2.3.0
 - Bot Discord -> overlay image/video/texte en temps reel
 - Son video via ffmpeg embarque (static-ffmpeg)
 - Barre de progression correcte pour images et videos
@@ -7,8 +7,7 @@ FileScreen v1.0
 - UI redessinee, imports lourds differees pour demarrage rapide
 - v2.1: cache images LRU, session requests persistante, pool threads, optimisations memoire
 - v2.2: commandes avancees (@pseudo, !anim, #modif, !option), nouveau logo
-- v2.3: syntaxe simplifiee (!chute au lieu de ![chute]), couleur d'accent personnalisable, UI amelioree
-- v2.4: auto-update : verification au demarrage, pop-up si MàJ dispo, telechargement + relance installeur
+- v2.3: syntaxe simplifiee (!chute au lieu de ![chute]), couleur d'accent personnalisable, UI amelioree, auto-update : verification au demarrage, pop-up si MàJ dispo, telechargement + relance installeur
 """
 
 # ── Version de l'application ───────────────────────────────────────────────
